@@ -69,9 +69,6 @@ let currentDirection = 0;  // 0 = su, 90 = destra, 180 = giù, 270 = sinistra
 let gameContext;
 
 
-
-
-
 function preload() {
     this.load.image('ball', 'images/ball.png');
     this.load.image('bulletType1', 'images/bullet1.png');
@@ -82,6 +79,12 @@ function preload() {
 }
 
 function create() {
+    for (const id in otherPlayers) {
+        otherPlayers[id].destroy();
+    }
+    otherPlayers = {};
+
+
     if (playerRole === 'Player 1') {
         player = this.add.image(200, 360, 'ball');  // Posizione per il Player 1
     } else {
@@ -110,7 +113,13 @@ function create() {
 
     console.log("Player created:", player);
     console.log("WebSocket created:", ws);
-
+    this.input.on('touchstart', function(pointer) {
+        let touchX = pointer.x;
+        let touchY = pointer.y;
+        let angle = Phaser.Math.Angle.Between(player.x, player.y, touchX, touchY);
+        fireBullet(player.x, player.y, angle, "type1");
+    }, this);
+    
     // Codice per il joystick
     this.input.on('pointerdown', function (pointer) {
         if (pointer.x < config.width / 2) {
@@ -192,7 +201,7 @@ function create() {
 
         let shootArea = this.add.zone(config.width / 2, 0, config.width / 2, config.height).setInteractive();
         shootArea.on('pointerdown', (pointer) => {
-            let angle = Phaser.Math.Angle.Between(joystickBase.x, joystickBase.y, joystick.x, joystick.y);
+            let angle = Phaser.Math.Angle.Between(player.x, player.y, pointer.x, pointer.y);
             fireBullet(player.x, player.y, angle, "type1");
         });
 
@@ -339,6 +348,9 @@ function fireBullet(x, y, angle, bulletType) {
     } else if (bulletType === "type5") {
         bullet = bulletsType5.get(x, y);
     }
+
+    let calculatedAngle = Phaser.Math.RadToDeg(angle) - 90; // Sottrai 90 gradi per allineare correttamente
+    bullet.setAngle(calculatedAngle); // 
 
     if (bullet) {
         bullet.setActive(true).setVisible(true);  // Rendi il proiettile attivo e visibile
