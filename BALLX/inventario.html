@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Balls War - Inventory</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; margin: 0 auto; background-color: #333; }
+    </style>
+</head>
+<body>
+    <script>
+        var config = {
+            type: Phaser.AUTO,
+            width: 640,
+            height: 360,
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
+            }
+        };
+
+        var stars = [];
+        var playerInventory = JSON.parse(localStorage.getItem('playerInventory')) || [];
+
+
+        var game = new Phaser.Game(config);
+
+        function preload() {
+            this.load.image('background', 'assets/images/background.png');
+            this.load.image('star', 'assets/images/star.png');
+            this.load.image('bullet', 'assets/images/bullet1.png');
+            this.load.image('bullet2', 'assets/images/bullet2big.png');
+            this.load.image('bullet3', 'assets/images/bullet3big.png');
+            this.load.image('bullet4', 'assets/images/bullet4big.png');
+            this.load.image('bullet5', 'assets/images/bullet5big.png');
+            this.load.image('backButton', 'assets/images/back_button.png');
+        }
+
+        function create() {
+            this.add.image(320, 180, 'background').setScale(1.1).setAlpha(0.8);
+
+            for (let i = 0; i < 50; i++) {
+                let x = Math.random() * 640;
+                let y = Math.random() * 360;
+                let star = this.add.image(x, y, 'star').setAlpha(0.5).setScale(Math.random() * 0.5);
+                stars.push(star);
+            }
+
+            this.add.text(200, 20, 'Inventory', { fontSize: '40px', fill: '#FFF', fontStyle: 'bold' });
+// Inserisci questa parte prima del forEach del tuo inventario
+let defaultBullet = 'bullet'; // nome dell'immagine del proiettile di default
+let defaultButton = this.add.image(50, 200, defaultBullet).setInteractive().setScale(0.5);
+
+defaultButton.on('pointerdown', () => {
+    localStorage.setItem('selectedUpgrade', defaultBullet);
+});
+
+            playerInventory.forEach((item, index) => {
+    let xPos = 100 + index * 120;
+    let itemButton = this.add.image(xPos, 200, item).setInteractive().setScale(0.5);
+
+    itemButton.on('pointerdown', () => {
+        localStorage.setItem('selectedBullet', item);  // Salva il proiettile selezionato
+    });
+});
+
+            let backButton = this.add.image(50, 50, 'backButton').setInteractive().setScale(0.7);
+            backButton.on('pointerdown', () => {
+                window.location.href = 'schermata_iniziale.html';
+            });
+        }
+
+        function update() {
+            stars.forEach(star => {
+                star.angle += 0.5;
+            });
+
+        }
+    </script>
+</body>
+</html>
