@@ -307,7 +307,8 @@ if (data.type === 'matchFound') {
         // Qui potrebbe iniziare la logica del gioco
     }, [], this);
 } else if (data.type === 'updatePlayers') {
-    
+    console.log("Received updatePlayers message with data:", data);  // Aggiungi questa riga
+
     // Gestione degli altri giocatori 
 
     for (const [id, position] of Object.entries(data.players)) {
@@ -385,6 +386,8 @@ function sendGameState() {
 
 function sendPosition(x, y) {
 if (isWsOpen) {
+    console.log("Preparing to send updatePosition message with data:", { x: x, y: y });
+
   ws.send(JSON.stringify({ type: 'updatePosition', id: playerId, position: { x: x, y: y }, matchId: currentMatchId }));
 } else {
     console.log("WebSocket is not open. Ready state: ", ws ? ws.readyState : 'WebSocket is not defined');
