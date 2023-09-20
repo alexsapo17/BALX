@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Balls War - Shop</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <style>
+        body { 
+            margin: 0;
+            background-color: #2a2a2a; 
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
+        }
+    </style>
+    
+
+</head>
+<body>
+    <button onclick="resetGame()">Reset Game</button>
+    <script>
+        var config = {
+            type: Phaser.AUTO,
+            width: 640,
+            height: 360,
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
+            }
+        };
+
+        var stars = [];
+        var playerCoins = localStorage.getItem('playerCoins') || 10000;  // Load coins or set to 100 if they don't exist
+
+        var game = new Phaser.Game(config);
+
+        function preload() {
+            this.load.image('background', 'assets/images/background.png');
+            this.load.image('star', 'assets/images/star.png');
+            this.load.image('bullet2', 'assets/images/bullet2.png');
+            this.load.image('bullet3', 'assets/images/bullet3.png');
+            this.load.image('bullet4', 'assets/images/bullet4.png');
+            this.load.image('bullet5', 'assets/images/bullet5.png');       
+            this.load.image('backButton', 'assets/images/back_button.png');
+        }
+
+        function create() {
+            this.add.image(320, 180, 'background').setScale(1.1).setAlpha(0.8);
+
+            for (let i = 0; i < 50; i++) {
+                let x = Math.random() * 640;
+                let y = Math.random() * 360;
+                let star = this.add.image(x, y, 'star').setAlpha(0.5).setScale(Math.random() * 0.5);
+                stars.push(star);
+            }
+
+            this.add.text(200, 20, 'Shop', { fontSize: '40px', fill: '#FFF', fontStyle: 'bold' });
+
+            let bulletImages = ['bullet2', 'bullet3', 'bullet4', 'bullet5'];
+            let bulletCosts = [2000, 3000, 4000, 6000];
+
+            bulletImages.forEach((bullet, index) => {
+                let xPos = 100 + index * 120;
+                let bulletButton = this.add.image(xPos, 200, bullet).setInteractive().setScale(3);
+
+                let costText = this.add.text(xPos - 10, 250, `${bulletCosts[index]} coins`, { fontSize: '16px', fill: '#FFF' });
+
+                bulletButton.on('pointerdown', function() {
+                    if(playerCoins >= bulletCosts[index]) {
+                        // Deduct coins
+                        playerCoins -= bulletCosts[index];
+                        localStorage.setItem('playerCoins', playerCoins);
+
+                        // Add the power-up to the inventory if not already present
+                        let inventory = JSON.parse(localStorage.getItem('playerInventory')) || [];
+                        if (!inventory.includes(bullet)) {
+                            inventory.push(bullet);
+                        }
+                        localStorage.setItem('playerInventory', JSON.stringify(inventory));
+
+                        // Update the coin display
+                        this.coinText.setText(`Coins: ${playerCoins}`);
+
+                        // Create dynamic coin animation
+                        let graphics = this.add.graphics({ x: 0, y: 0 });
+                        let coin = {
+                            x: xPos,
+                            y: 200,
+                            radius: 15,
+                            angle: 0,
+                            scale: 1
+                        };
+                        
+                        this.tweens.add({
+                            targets: coin,
+                            angle: 360,
+                            scale: 1.5,
+                            duration: 1000,
+                            repeat: 0,
+                            yoyo: false,
+                            ease: 'Sine.easeInOut',
+                            onUpdate: function() {
+                                graphics.clear();
+                                graphics.fillStyle(0xFFD700, 1);
+                                graphics.save();
+                                graphics.translate(coin.x, coin.y);
+                                graphics.rotate(Phaser.Math.DegToRad(coin.angle));
+                                graphics.fillCircle(0, 0, coin.radius * coin.scale);
+                                graphics.restore();
+                            },
+                            onComplete: function() {
+                                graphics.clear();
+                            }
+                        });
+                    }
+                }, this);
+            });
+
+            this.coinText = this.add.text(400, 20, `Coins: ${playerCoins}`, { fontSize: '24px', fill: '#FFF' });
+
+            let backButton = this.add.image(50, 50, 'backButton').setInteractive().setScale(0.7);
+            backButton.on('pointerdown', () => {
+                window.location.href = 'schermata_iniziale.html';
+            });
+        }
+
+        function update() {
+            stars.forEach(star => {
+                star.angle += 0.5;
+                let scale = 0.5 + 0.1 * Math.sin(star.angle * 0.1);
+                star.setScale(scale);
+            });
+            this.coinText.setText(`Coins: ${playerCoins}`);
+        }
+
+        
+        function resetGame() {
+            localStorage.clear();
+            window.location.href = 'schermata_iniziale.html';
+        }
+    </script>
+</body>
+</html>
