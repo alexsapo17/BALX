@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+
+    <title>Balls War</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+
+    <style>
+        body { margin: 0; }
+        canvas { display: block; margin: 0 auto; background-color: #333; }
+    </style>
+</head>
+<body>
+    <div id="shootArea" style="position: absolute; right: 0; top: 0; width: 50%; height: 100%; z-index: 100;"></div>
+
+    <script>
+    var config = {
+        type: Phaser.AUTO,
+        width: 640,
+        height: 360,
+        physics: {
+            default: 'arcade',
+            arcade: {
+                gravity: { y: 0 },
+                debug: false
+            }
+        },
+        scene: {
+            preload: preload,
+            create: create,
+            update: update
+        }
+    };
+    
+    var player1, player2, player1HealthBar, player2HealthBar, gameOverText;
+    var cursors, spaceKey, bullets, shieldKey, specialAbilityKey, player1ShieldActive = false;
+    var player1Health = 100;
+    var player2Health = 100;
+    var specialAbilityCooldown = 0;
+    var coinText;
+    var playerSpeed = 200; 
+    var bulletImage = 'bullet';
+    var specialAttackCooldown = 0;
+    var joystickBase;
+    var joystick;
+    var dragging = false;
+var wall1, wall2;
+var sceneContext; 
+var rotationSpeed = 0.05;
+var lastShotTime = 0;
+var shotCooldown = 200;  // 500 ms di cooldown
+var coinsEarnedThisGame = 0;
+var acceleration = 800;
+var drag = 300;
+var maxSpeed = 400;
+var inertia = 0.99;
+let dragState = false;
+let trailPositions = [];                  
+let trailCircles = []; // Variabile globale per tenere traccia dei cerchi della scia
+let playerCoins = parseInt(localStorage.getItem('playerCoins')) || 0;
+var activePointers = {};
+var selectedBullet = localStorage.getItem('selectedBullet');  // Carica il potenziamento selezionato
+var joystickActive = false;
+var shootActive = false;
+let damageAreas;
+let myRole = null;
+
+document.addEventListener("DOMContentLoaded", function() {
+    document.getElementById('shootArea').addEventListener('touchstart', function() {
+        shootBullet(player1);
+    });
+});
+
+
+    function preload() {
+        this.load.image('ball', 'assets/images/ball.png');
+        this.load.image('bullet1', 'assets/images/bullet1.png');
+        this.load.image('bullet2', 'assets/images/bullet2.png');
+        this.load.image('bullet3', 'assets/images/bullet3.png');
+        this.load.image('bullet4', 'assets/images/bullet4.png');
+        this.load.image('bullet5', 'assets/images/bullet5.png');
+
+    }
+    const ws = new WebSocket('ws://192.168.1.40:8080');
+    
+    function create() {
+
+
+ws.onopen = () => {
+  console.log('Connected to the WebSocket');
+};
+
+ws.onmessage = function(event) {
+    let data = JSON.parse(event.data);
+
+    if (data.type === 'assignRole') {
+        myRole = data.role;
+        console.log("You are:", myRole);
+        console.log("Ruolo assegnato: ", myRole);
+    } else if (data.type === 'move') {
+        if (data.playerId === 'player1' && myRole !== 'player1') {
+            player1.x = data.x;
+            player1.y = data.y;
+        } else if (data.playerId === 'player2' && myRole !== 'player2') {
+            player2.x = data.x;
+            player2.y = data.y;
+        }
+    }
+};
+
+        coinText = this.add.text(10,30, 'Coins: 0', { fontSize: '16px', fill: '#FFF' });
+    player1 = this.physics.add.sprite(100, 180, 'ball');
+    player2 = this.physics.add.sprite(540, 180, 'ball');
+    player1.setCollideWorldBounds(true);
+    player2.setCollideWorldBounds(true);
+    player1.setScale(0.2);
+    player2.setScale(0.2);
+    this.cameras.main.setBackgroundColor('#24252A');
+    sceneContext = this; 
+    let damageAreas = this.add.group();
+    cursors = this.input.keyboard.createCursorKeys();
+    spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    shieldKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+    specialAbilityKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+
+    console.log("Initializing bullets group.");
+
+
+bullets1 = this.physics.add.group({ key: 'bullet1', maxSize: 100, visible: false, active: false });
+bullets2 = this.physics.add.group({ key: 'bullet2', maxSize: 100, visible: false, active: false });
+bullets3 = this.physics.add.group({ key: 'bullet3', maxSize: 100, visible: false, active: false });
+bullets4 = this.physics.add.group({ key: 'bullet4', maxSize: 100, visible: false, active: false });
+bullets5 = this.physics.add.group({ key: 'bullet5', maxSize: 100, visible: false, active: false });
+
+// Use the image for bullets
+bullets1.children.iterate(function (bullet) {
+    bullet.setActive(false);  // Imposta lo stato attivo a false
+bullet.setVisible(false); // Imposta lo stato visibile a false
+    bullet.setTexture('bullet1');
+    bullet.setPosition(-100, -100);
+});
+bullets2.children.iterate(function (bullet) {
+    bullet.setActive(false);  // Imposta lo stato attivo a false
+bullet.setVisible(false); // Imposta lo stato visibile a false
+    bullet.setTexture('bullet2');
+    bullet.setPosition(-100, -100);
+});
+bullets3.children.iterate(function (bullet) {
+    bullet.setActive(false);  // Imposta lo stato attivo a false
+bullet.setVisible(false); // Imposta lo stato visibile a false
+    bullet.setTexture('bullet3');
+    bullet.setPosition(-100, -100);
+});
+bullets4.children.iterate(function (bullet) {
+    bullet.setActive(false);  // Imposta lo stato attivo a false
+bullet.setVisible(false); // Imposta lo stato visibile a false
+    bullet.setTexture('bullet4');
+    bullet.setPosition(-100, -100);
+});
+bullets5.children.iterate(function (bullet) {
+    bullet.setActive(false);  // Imposta lo stato attivo a false
+bullet.setVisible(false); // Imposta lo stato visibile a false
+    bullet.setTexture('bullet5');
+    bullet.setPosition(-100, -100);
+});
+
+this.damageAreas = this.add.group();
+this.physics.add.overlap(damageAreas, [player1, player2], function(damageArea, hitPlayer) {
+    let bulletOwner = damageArea.getData("owner");
+    if (hitPlayer !== bulletOwner) {
+        hitPlayer.energy -= 5;  // Sostituisci con la tua logica per ridurre l'energia o la vita
+    }
+});
+
+    console.log("Setting up collisions between players and bullets.");
+    this.physics.add.collider(player1, bullets1, hitPlayer1, null, this);
+    this.physics.add.collider(player1, bullets2, hitPlayer1, null, this); 
+    this.physics.add.collider(player1, bullets3, hitPlayer1, null, this);
+    this.physics.add.collider(player1, bullets4, hitPlayer1, null, this); 
+    this.physics.add.collider(player1, bullets5, hitPlayer1, null, this);
+
+    this.physics.add.collider(player2, bullets1, hitPlayer2, null, this);
+    this.physics.add.collider(player2, bullets2, hitPlayer2, null, this);
+    this.physics.add.collider(player2, bullets3, hitPlayer2, null, this);
+    this.physics.add.collider(player2, bullets4, hitPlayer2, null, this); 
+    this.physics.add.collider(player2, bullets5, hitPlayer2, null, this);
+
+    this.input.on('pointerdown', function (pointer) {
+    if (pointer.x < config.width / 2) {
+        if (joystickBase) joystickBase.destroy();
+        if (joystick) joystick.destroy();
+
+        joystickBase = this.add.circle(pointer.x, pointer.y, 50, 0x888888, 0.5);
+        joystick = this.add.circle(pointer.x, pointer.y, 20, 0xFFFFFF, 0.7);
+        dragging = true;
+    }
+}, this);
+
+
+
+this.input.on('pointermove', function (pointer) {
+    if (dragging && pointer.x < config.width / 2) {
+        joystick.x = pointer.x;
+        joystick.y = pointer.y;
+    }
+}, this);
+
+
+this.input.on('pointerup', function (pointer) {
+    if (dragging && pointer.x < config.width / 2) {
+        if (joystickBase) joystickBase.destroy();
+        if (joystick) joystick.destroy();
+        dragging = false;
+    }
+}, this);
+
+
+    
+
+    player1HealthBar = this.add.graphics();
+    player2HealthBar = this.add.graphics();
+    drawHealthBars();
+    player1.setDrag(drag);
+    player1.setMaxVelocity(maxSpeed);
+
+
+    
+    gameOverText = this.add.text(320, 180, 'GAME OVER', { fontSize: '64px', fill: '#FFF' });
+    gameOverText.setOrigin(0.5);
+    gameOverText.setVisible(false);
+    
+    for (let i = 0; i < 20; i++) {
+        let circle = this.add.circle(0, 0, 5, 0xff0000);
+        circle.setAlpha(0);
+        trailCircles.push(circle);
+    }
+
+    wall1 = this.add.rectangle(200, 180, 50, 100, 0xFFFFFF);
+    wall2 = this.add.rectangle(440, 180, 50, 100, 0xFFFFFF);
+    this.physics.add.existing(wall1);
+    this.physics.add.existing(wall2);
+    this.physics.add.collider(player1, wall1);
+    this.physics.add.collider(player1, wall2);
+    this.physics.add.collider(player2, wall1);
+    this.physics.add.collider(player2, wall2);
+
+
+}
+
+function createJoystick(x, y) {
+    // Distruggi il joystick esistente se c'è
+    if (joystickBase) joystickBase.destroy();
+    if (joystick) joystick.destroy();
+
+    joystickBase = sceneContext.add.circle(x, y, 50, 0x888888, 0.5);
+    joystick = sceneContext.add.circle(x, y, 20, 0xFFFFFF, 0.7);
+
+    joystick.setInteractive({ draggable: true });
+    
+    joystick.on('dragstart', function (pointer, dragX, dragY) {
+        dragState = true;
+    });
+
+    joystick.on('drag', function (pointer, dragX, dragY) {
+        this.x = dragX;
+        this.y = dragY;
+    });
+
+    joystick.on('dragend', function (pointer) {
+        dragState = false;
+        this.x = joystickBase.x;
+        this.y = joystickBase.y;
+    });
+}
+
+
+
+
+function update() {
+    // Verifica che player1 e player1.body siano definiti
+    if (myRole === 'player1' && player1 && player1.body) {
+        // Resetta l'accelerazione
+        player1.setAcceleration(0, 0);
+
+        // Gestione del cooldown delle abilità speciali
+        if (specialAbilityCooldown > 0) {
+            specialAbilityCooldown -= 1;
+        }
+
+        // Controllo della direzione
+        if (cursors.left.isDown) {
+            player1.setAccelerationX(-acceleration);
+        } else if (cursors.right.isDown) {
+            player1.setAccelerationX(acceleration);
+        }
+
+        if (cursors.up.isDown) {
+            player1.setAccelerationY(-acceleration);
+        } else if (cursors.down.isDown) {
+            player1.setAccelerationY(acceleration);
+        }
+
+        // Applica l'inerzia
+        player1.body.velocity.x *= inertia;
+        player1.body.velocity.y *= inertia;
+
+        // Limite di velocità
+        player1.setMaxVelocity(maxSpeed);
+
+        // Sparo del proiettile
+        if (spaceKey.isDown) {
+            shootBullet(player1);
+        }
+
+        // Attivazione dello scudo
+        if (shieldKey.isDown && !player1ShieldActive) {
+            activateShield(player1);
+        }
+
+        // Abilità speciale
+        if (specialAbilityKey.isDown && specialAbilityCooldown === 0) {
+            shootSpecialBullet(player1);
+            specialAbilityCooldown = 300;
+        }
+
+        // Attacco speciale
+        if (specialAbilityKey.isDown && specialAttackCooldown <= 0) {
+            specialAttack(player1);
+            specialAttackCooldown = 200;
+        }
+    }
+        // Verifica che player2 e player2.body siano definiti
+        if (myRole === 'player2' && player2 && player2.body) {
+        // Resetta l'accelerazione
+        player2.setAcceleration(0, 0);
+
+        // Gestione del cooldown delle abilità speciali
+        if (specialAbilityCooldown > 0) {
+            specialAbilityCooldown -= 1;
+        }
+
+        // Controllo della direzione
+        if (cursors.left.isDown) {
+            player2.setAccelerationX(-acceleration);
+        } else if (cursors.right.isDown) {
+            player2.setAccelerationX(acceleration);
+        }
+
+        if (cursors.up.isDown) {
+            player2.setAccelerationY(-acceleration);
+        } else if (cursors.down.isDown) {
+            player2.setAccelerationY(acceleration);
+        }
+
+        // Applica l'inerzia
+        player2.body.velocity.x *= inertia;
+        player2.body.velocity.y *= inertia;
+
+        // Limite di velocità
+        player2.setMaxVelocity(maxSpeed);
+
+        // Sparo del proiettile
+        if (spaceKey.isDown) {
+            shootBullet(player2);
+        }
+
+        // Attivazione dello scudo
+        if (shieldKey.isDown && !player1ShieldActive) {
+            activateShield(player2);
+        }
+
+        // Abilità speciale
+        if (specialAbilityKey.isDown && specialAbilityCooldown === 0) {
+            shootSpecialBullet(player2);
+            specialAbilityCooldown = 300;
+        }
+
+        // Attacco speciale
+        if (specialAbilityKey.isDown && specialAttackCooldown <= 0) {
+            specialAttack(player2);
+            specialAttackCooldown = 200;
+        }
+
+        if (myRole === 'player1' && (player1.body.velocity.x !== 0 || player1.body.velocity.y !== 0)) {
+    ws.send(JSON.stringify({
+        type: 'move',
+        playerId: 'player1',
+        x: player1.x,
+        y: player1.y
+    }));
+}
+
+if (myRole === 'player2' && (player2.body.velocity.x !== 0 || player2.body.velocity.y !== 0)) {
+    ws.send(JSON.stringify({
+        type: 'move',
+        playerId: 'player2',
+        x: player2.x,
+        y: player2.y
+    }));
+}
+
+
+
+trailPositions.push({ x: player1.x, y: player1.y });
+    if (trailPositions.length > 10) {
+        trailPositions.shift();
+    }
+
+    trailPositions.forEach((pos, index) => {
+        let circle = trailCircles[index];
+        circle.x = pos.x;
+        circle.y = pos.y;
+        circle.setAlpha(index / trailPositions.length);
+    });
+    if (joystick && joystickBase) {
+    let angle = Phaser.Math.Angle.Between(joystickBase.x, joystickBase.y, joystick.x, joystick.y);
+    let distance = Phaser.Math.Distance.Between(joystickBase.x, joystickBase.y, joystick.x, joystick.y);
+    
+    player1.setVelocityX(Math.cos(angle) * (distance/50) * playerSpeed);
+    player1.setVelocityY(Math.sin(angle) * (distance/50) * playerSpeed);
+}
+
+trailPositions.push({ x: player2.x, y: player2.y });
+    if (trailPositions.length > 10) {
+        trailPositions.shift();
+    }
+
+    trailPositions.forEach((pos, index) => {
+        let circle = trailCircles[index];
+        circle.x = pos.x;
+        circle.y = pos.y;
+        circle.setAlpha(index / trailPositions.length);
+    });
+    if (joystick && joystickBase) {
+    let angle = Phaser.Math.Angle.Between(joystickBase.x, joystickBase.y, joystick.x, joystick.y);
+    let distance = Phaser.Math.Distance.Between(joystickBase.x, joystickBase.y, joystick.x, joystick.y);
+    
+    player2.setVelocityX(Math.cos(angle) * (distance/50) * playerSpeed);
+    player2.setVelocityY(Math.sin(angle) * (distance/50) * playerSpeed);
+}
+
+
+}
+}
+
+
+function shootBullet(player) {
+    let currentTime = sceneContext.time.now;
+    if (currentTime - lastShotTime < shotCooldown) {
+        return;
+    }
+    lastShotTime = currentTime;
+
+let bullet = bullets1.get(player.x, player.y);  
+
+    if (bullet === null) { 
+        return; 
+    }
+
+    bullet.setData("owner", player);
+    bullet.setScale(0.25);
+    bullet.setTexture('bullet1');
+    let angle = Phaser.Math.RadToDeg(Math.atan2(player.body.acceleration.y, player.body.acceleration.x));
+    if (player.body.acceleration.x === 0 && player.body.acceleration.y === 0) {
+        angle = Phaser.Math.RadToDeg(Math.atan2(player.body.velocity.y, player.body.velocity.x));
+    }
+
+    bullet.setActive(true).setVisible(true);
+
+    if (selectedBullet === 'bullet2') {
+        bulletGroup = bullets2;
+        bullet.setCollideWorldBounds(true);
+        bullet.setBounce(1, 1);
+        bullet.setTexture('bullet2');
+        sceneContext.time.delayedCall(3000, function() {
+            bullet.setActive(false).setVisible(false);
+            bullet.destroy();
+        });
+    } else if (selectedBullet === 'bullet3') {
+    bulletGroup = bullets3;
+    bullet.setTexture('bullet3');
+    bullet.setActive(true);  // Aggiunto per assicurarsi che il proiettile sia attivo
+    sceneContext.physics.moveToObject(bullet, (player === player1) ? player2 : player1, 350);
+} else if (selectedBullet === 'bullet4') {
+    bulletGroup = bullets4;
+    bullet.setCollideWorldBounds(true);
+    bullet.setBounce(1, 1);
+    bullet.setTexture('bullet4');
+    sceneContext.time.delayedCall(3000, function() {
+        // Crea 4 nuovi proiettili normali
+        for (let i = 0; i < 4; i++) {
+            let newBullet = bullets1.get(bullet.x, bullet.y); 
+            newBullet.setScale(0.5); 
+            if (newBullet) {
+                newBullet.setActive(true).setVisible(true);
+                newBullet.setData("owner", player);
+                newBullet.setTexture('bullet1');
+                sceneContext.physics.velocityFromAngle(angle + i * 90, 350, newBullet.body.velocity);
+            }
+        }
+        bullet.setActive(false).setVisible(false);
+        bullet.destroy();
+    });
+} else if (selectedBullet === 'bullet5') {
+    bulletGroup = bullets5;
+    bullet.setTexture('bullet5');
+    bullet.setScale(0.5);  // Adatta la dimensione del proiettile
+    bullet.setData("trailPositions", []);  // Inizializza un array vuoto per tracciare la scia
+
+    sceneContext.time.addEvent({
+        delay: 100,
+        callback: function() {
+            if (bullet.active) {
+                let trailPositions = bullet.getData("trailPositions");
+                trailPositions.push({ x: bullet.x, y: bullet.y });
+                
+                if (trailPositions.length > 50) {
+                    trailPositions.shift();
+                }
+                
+                bullet.setData("trailPositions", trailPositions);
+
+                let damageArea = sceneContext.add.circle(bullet.x, bullet.y, 5, 0xff0000, 0.5);
+                damageAreas.add(damageArea);
+
+                sceneContext.time.delayedCall(2000, function() {
+                    damageArea.destroy();
+                });
+            }
+        },
+        loop: true
+    });
+}
+
+
+if (selectedBullet === 'bullet3') {
+    bulletGroup = bullets3;
+    bullet.setTexture('bullet3');
+    bullet.setActive(true);
+    sceneContext.time.delayedCall(3000, function() {
+    if (bullet && bullet.active) { // Verifica che il proiettile esista e sia attivo
+        bullet.setActive(false).setVisible(false);
+        bullet.destroy();
+    }
+});
+    // Avvia un timer per questo specifico proiettile
+    let bulletTimer = sceneContext.time.addEvent({
+        delay: 100, // ogni 100 millisecondi
+        callback: updateBullet3Direction,
+        args: [bullet, player],
+        loop: true
+    });
+
+    bullet.setData('timer', bulletTimer);
+} 
+sceneContext.physics.velocityFromAngle(angle, 200, bullet.body.velocity);
+
+}
+
+// Funzione di callback per aggiornare la direzione del bullet3
+function updateBullet3Direction(bullet, player) {
+    if (bullet && bullet.active) {
+        let target = (player === player1) ? player2 : player1;
+        sceneContext.physics.moveToObject(bullet, target, 180);
+    } else {
+        // Cancella il timer se il proiettile non è più attivo o non esiste
+        if (bullet && bullet.getData('timer')) {
+            bullet.getData('timer').remove();
+        }
+    }
+}
+
+    
+    function hitPlayer1(player, bullet) {
+    if (bullet.getData("owner") !== player) {
+        bullet.setActive(false).setVisible(false);
+        bullet.destroy(); 
+        if (!player1ShieldActive) {
+            player1Health -= 10;
+            drawHealthBars();
+            if (player1Health <= 0) {
+                addCoins(10);
+                player1.destroy();
+                gameOver("Player 2 Wins");
+            }
+        } else {
+            bullet.setActive(false).setVisible(false);
+        }
+        let explosion = this.add.circle(player.x, player.y, 10, 0xff0000);
+
+// Fai espandere e scomparire il cerchio
+this.tweens.add({
+    targets: explosion,
+    radius: { from: 10, to: 40 },
+    alpha: { from: 1, to: 0 },
+    duration: 300,
+    onComplete: function () {
+        explosion.destroy();
+    }
+});
+
+    }
+ 
+}
+
+    
+function hitPlayer2(player, bullet) {
+    if (bullet.getData("owner") !== player) {
+        bullet.setActive(false).setVisible(false);
+        player2Health -= 10;
+        bullet.destroy(); 
+        drawHealthBars();
+        if (player2Health <= 0) {
+            addCoins(100);
+            player2.destroy();
+            gameOver("Player 1 Wins");
+        }
+        let explosion = this.add.circle(player.x, player.y, 10, 0xff0000);
+
+// Fai espandere e scomparire il cerchio
+this.tweens.add({
+    targets: explosion,
+    radius: { from: 10, to: 40 },
+    alpha: { from: 1, to: 0 },
+    duration: 300,
+    onComplete: function () {
+        explosion.destroy();
+    }
+});
+    }
+}
+    
+    function drawHealthBars() {
+        player1HealthBar.clear();
+        player1HealthBar.fillStyle(0x00FF00);
+        player1HealthBar.fillRect(10, 10, player1Health, 10);
+    
+        player2HealthBar.clear();
+        player2HealthBar.fillStyle(0x00FF00);
+        player2HealthBar.fillRect(530, 10, player2Health, 10);
+    }
+    
+    function activateShield(player) {
+    player1ShieldActive = true;
+    player.setTint(0x00FF00);
+    sceneContext.time.delayedCall(5000, function () {
+        player1ShieldActive = false;
+        player.clearTint();
+    }, [], this);
+}
+
+function addCoins(amount) {
+    let coins = parseInt(localStorage.getItem('playerCoins')) || 0;  
+    coins += amount;
+    coinsEarnedThisGame += amount; // Aggiorna la variabile
+    localStorage.setItem('playerCoins', coins);
+    // qui non aggiorniamo coinText
+    console.log(localStorage.getItem('playerCoins'));
+}
+
+function gameOver(winnerText) {
+    gameOverText.setText(winnerText);
+    gameOverText.setVisible(true);
+    coinText.setText('coins +' + coinsEarnedThisGame); // Mostra solo le monete guadagnate
+    setTimeout(function() {
+        window.location.href = 'schermata_iniziale.html';
+    }, 3000);
+    coinsEarnedThisGame = 0; // Reimposta la variabile per la prossima partita
+}
+function specialAttack(player) {
+    for (let angle = 0; angle < 360; angle += 45) {
+        console.log("Getting a bullet from bullets group.");
+        if (bullets) { let bullet = bullets.get(player.x, player.y); }
+        if (bullet === null) { return; }
+        bullet.setData("owner", player);  // Set the owner of the bullet
+        if (bullet) {
+            bullet.setActive(true).setVisible(true);
+            this.physics.velocityFromAngle(angle, 300, bullet.body.velocity);
+        }
+    }
+}
+
+
+var game = new Phaser.Game(config);
+
+</script>
+</body>
+</html>
